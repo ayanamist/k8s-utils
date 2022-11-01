@@ -1,28 +1,29 @@
-package streamlister
+package protobuf
 
 import (
 	"errors"
 	"fmt"
 	"io"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type unknownStreamUnmarshaler struct {
-	OnTypeMeta        func(runtime.TypeMeta)
-	OnRaw             func(*streamBuffer) error
+type UnknownStreamUnmarshaler struct {
+	OnTypeMeta        func(*metav1.TypeMeta)
+	OnRaw             func(*StreamBuffer) error
 	OnContentEncoding func(string)
 	OnContentType     func(string)
 }
 
-func (u unknownStreamUnmarshaler) Unmarshal(buffer *streamBuffer) error {
+func (u UnknownStreamUnmarshaler) Unmarshal(buffer *StreamBuffer) error {
 	onTypeMeta := u.OnTypeMeta
 	if onTypeMeta == nil {
-		onTypeMeta = func(runtime.TypeMeta) {}
+		onTypeMeta = func(*metav1.TypeMeta) {}
 	}
 	onRaw := u.OnRaw
 	if onRaw == nil {
-		onRaw = func(b *streamBuffer) error {
+		onRaw = func(b *StreamBuffer) error {
 			return b.Discard()
 		}
 	}
@@ -95,11 +96,11 @@ Loop:
 			if err != nil {
 				return err
 			}
-			var typeMeta runtime.TypeMeta
+			var typeMeta metav1.TypeMeta
 			if err := typeMeta.Unmarshal(buf); err != nil {
 				return err
 			}
-			onTypeMeta(typeMeta)
+			onTypeMeta(&typeMeta)
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {

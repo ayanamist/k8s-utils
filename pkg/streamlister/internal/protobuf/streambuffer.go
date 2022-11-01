@@ -1,29 +1,30 @@
-package streamlister
+package protobuf
 
 import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 )
 
-type streamBuffer struct {
+type StreamBuffer struct {
 	idx int
 	len int
 	r   io.Reader
 }
 
-func newStreamBuffer(r io.Reader, len int) *streamBuffer {
-	return &streamBuffer{
+func NewStreamBuffer(r io.Reader, len int) *StreamBuffer {
+	return &StreamBuffer{
 		r:   r,
 		len: len,
 	}
 }
 
-func (s *streamBuffer) Len() int {
+func (s *StreamBuffer) Len() int {
 	return s.len
 }
 
-func (s *streamBuffer) Get(i int) (byte, error) {
+func (s *StreamBuffer) Get(i int) (byte, error) {
 	if i < s.idx {
 		return 0, fmt.Errorf("invalid index %d < %d", i, s.idx)
 	}
@@ -36,7 +37,7 @@ func (s *streamBuffer) Get(i int) (byte, error) {
 	return buf[needRead-1], nil
 }
 
-func (s *streamBuffer) Slice(start, end int) ([]byte, error) {
+func (s *StreamBuffer) Slice(start, end int) ([]byte, error) {
 	if start < s.idx {
 		return nil, fmt.Errorf("invalid index %d < %d", start, s.idx)
 	}
@@ -54,26 +55,26 @@ func (s *streamBuffer) Slice(start, end int) ([]byte, error) {
 	return buf[start:end], nil
 }
 
-func (s *streamBuffer) SubStream(start, end int) (*streamBuffer, error) {
+func (s *StreamBuffer) SubStream(start, end int) (*StreamBuffer, error) {
 	if start < s.idx {
 		return nil, fmt.Errorf("invalid index %d < %d", start, s.idx)
 	}
 	if start == end {
-		return newStreamBuffer(bytes.NewReader(nil), 0), nil
+		return NewStreamBuffer(bytes.NewReader(nil), 0), nil
 	}
 	newIdx := end
 	start -= s.idx
 	end -= s.idx
 	s.idx = newIdx
 	if start > 0 {
-		if _, err := io.Copy(io.Discard, io.LimitReader(s.r, int64(start))); err != nil {
+		if _, err := io.Copy(ioutil.Discard, io.LimitReader(s.r, int64(start))); err != nil {
 			return nil, err
 		}
 	}
-	return newStreamBuffer(io.LimitReader(s.r, int64(end-start)), end-start), nil
+	return NewStreamBuffer(io.LimitReader(s.r, int64(end-start)), end-start), nil
 }
 
-func (s *streamBuffer) Discard() error {
-	_, err := io.Copy(io.Discard, s.r)
+func (s *StreamBuffer) Discard() error {
+	_, err := io.Copy(ioutil.Discard, s.r)
 	return err
 }

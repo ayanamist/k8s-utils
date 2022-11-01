@@ -1,38 +1,17 @@
-package streamlister
+package protobuf
 
 import (
 	"fmt"
 	"io"
-	"sync"
 
+	"github.com/gogo/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/ayanamist/k8s-utils/pkg/streamlister/internal/types"
 )
 
-func unmarshalListStream(dAtA *streamBuffer, param ParamInterface) error {
-	bufCh := make(chan []byte, 4000)
-	errCh := make(chan error, 1)
-	const parallelism = 2
-	wg := &sync.WaitGroup{}
-	wg.Add(parallelism)
-	for i := 0; i < parallelism; i++ {
-		go func() {
-			defer wg.Done()
-			for buf := range bufCh {
-				obj := param.ObjectFactory()
-				if err := obj.Unmarshal(buf); err != nil {
-					select {
-					case errCh <- err:
-					default:
-					}
-					return
-				} else {
-					param.OnObject(obj)
-				}
-			}
-		}()
-	}
-
+func UnmarshalListStream(dAtA *StreamBuffer, param types.ParamInterface) error {
 	l := dAtA.Len()
 	iNdEx := 0
 Loop:
@@ -142,15 +121,11 @@ Loop:
 			if err != nil {
 				return err
 			}
-
-			select {
-			case err = <-errCh:
-				close(bufCh)
-				wg.Wait()
+			obj := param.ObjectFactory()
+			if err := obj.(proto.Unmarshaler).Unmarshal(buf); err != nil {
 				return err
-			case bufCh <- buf:
 			}
-
+			param.OnObject(obj)
 			iNdEx = postIndex
 		default:
 			if err := dAtA.Discard(); err != nil {
@@ -163,8 +138,5 @@ Loop:
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
 	}
-
-	close(bufCh)
-	wg.Wait()
 	return nil
 }

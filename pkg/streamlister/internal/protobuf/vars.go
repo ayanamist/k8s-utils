@@ -1,0 +1,3 @@
+package protobuf
+
+var EncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
